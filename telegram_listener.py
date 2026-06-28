@@ -1,8 +1,8 @@
 """
 Telegram listener.
 
-This script listens for new Telegram text messages and forwards them into
-the existing signal processing pipeline.
+This script listens only to the configured Telegram channel and forwards
+new text messages into the existing signal processing pipeline.
 """
 
 from telethon import TelegramClient, events
@@ -22,6 +22,25 @@ def validate_telegram_config():
 
     if Config.TELEGRAM_API_HASH == "":
         raise RuntimeError("TELEGRAM_API_HASH is missing in the .env file.")
+
+    if Config.TELEGRAM_TARGET_CHAT.strip() == "":
+        raise RuntimeError("TELEGRAM_TARGET_CHAT is missing in the .env file.")
+
+
+def normalize_target_chat(target_chat):
+    """
+    Normalize the configured Telegram channel value.
+    """
+
+    target_chat = target_chat.strip()
+
+    if target_chat.startswith("https://t.me/"):
+        target_chat = target_chat.replace("https://t.me/", "")
+
+    if target_chat.startswith("@"):
+        target_chat = target_chat[1:]
+
+    return target_chat
 
 
 def process_telegram_text(message_text, telegram_message_id):
@@ -46,7 +65,7 @@ def main():
     api_id = int(Config.TELEGRAM_API_ID)
     api_hash = Config.TELEGRAM_API_HASH
     session_name = Config.TELEGRAM_SESSION_NAME
-    target_chat = Config.TELEGRAM_TARGET_CHAT.strip()
+    target_chat = normalize_target_chat(Config.TELEGRAM_TARGET_CHAT)
 
     client = TelegramClient(
         session_name,
@@ -55,17 +74,13 @@ def main():
         sequential_updates=True,
     )
 
-    if target_chat == "":
-        event_filter = events.NewMessage()
-        print("Listening to all incoming Telegram messages.")
-    else:
-        event_filter = events.NewMessage(chats=target_chat)
-        print("Listening to Telegram chat:", target_chat)
+    print("Starting Telegram listener...")
+    print("Listening only to Telegram channel:", target_chat)
 
-    @client.on(event_filter)
+    @client.on(events.NewMessage(chats=target_chat))
     async def handle_new_message(event):
         """
-        Handle incoming Telegram messages.
+        Handle new text messages from the configured Telegram channel.
         """
 
         message_text = event.raw_text
@@ -75,8 +90,9 @@ def main():
 
         telegram_message_id = str(event.id)
 
-        print("New Telegram message received:")
-        print(message_text)
+        print("[TELEGRAM] New message received from target channel.")
+        print("[TELEGRAM] Message ID:", telegram_message_id)
+        print("[TELEGRAM] Text:", message_text)
 
         try:
             result = process_telegram_text(
@@ -84,12 +100,10 @@ def main():
                 telegram_message_id=telegram_message_id,
             )
 
-            print("Processing result:", result["message"])
+            print("[TELEGRAM] Processing result:", result["message"])
 
         except Exception as error:
-            print("Failed to process Telegram message:", str(error))
-
-    print("Starting Telegram listener...")
+            print("[TELEGRAM] Failed to process message:", str(error))
 
     client.start()
     client.run_until_disconnected()

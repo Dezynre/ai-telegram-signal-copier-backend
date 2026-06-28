@@ -1,3 +1,4 @@
+
 """
 Main Flask application.
 """
@@ -9,11 +10,7 @@ from config import Config
 from database import db
 from models import Signal
 
-from signal_service import (
-    process_raw_message,
-    get_next_pending_signal,
-    update_signal_execution_status,
-)
+from signal_service import process_raw_message, get_next_pending_signal, update_signal_execution_status
 
 
 app = Flask(__name__)
