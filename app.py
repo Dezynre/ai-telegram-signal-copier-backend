@@ -9,6 +9,7 @@ from flask import Flask, jsonify
 
 from config import Config
 from database import db
+from models import Signal
 
 # Create the Flask application instance.
 app = Flask(__name__)
