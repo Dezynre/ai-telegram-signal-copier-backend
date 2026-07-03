@@ -2,14 +2,17 @@
 Main Flask application.
 
 This module creates the Flask backend, loads configuration values,
-initializes the database extension, and exposes the first API endpoints.
+initializes the database extension, and exposes the API endpoints
+implemented in this part of the article.
 """
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 
 from config import Config
 from database import db
 from models import Signal
+from signal_service import process_raw_message
+
 
 # Create the Flask application instance.
 app = Flask(__name__)
@@ -19,6 +22,7 @@ app.config.from_object(Config)
 
 # Connect the SQLAlchemy extension to this Flask application.
 db.init_app(app)
+
 
 @app.get("/")
 def index():
@@ -36,6 +40,7 @@ def index():
             "health_endpoint": "/api/v1/health",
         }
     ), 200
+
 
 @app.get("/api/v1/health")
 def health():
@@ -55,11 +60,89 @@ def health():
         }
     ), 200
 
+
+@app.get("/api/v1/signals")
+def list_signals():
+    """
+    Return all signal records stored in the database.
+
+    Newer records are returned first so that the most recent test
+    messages are easier to see during development.
+    """
+
+    signals = db.session.execute(
+        db.select(Signal).order_by(Signal.id.desc())
+    ).scalars().all()
+
+    return jsonify(
+        {
+            "count": len(signals),
+            "signals": [signal.to_dict() for signal in signals],
+        }
+    ), 200
+
+
+@app.post("/api/v1/test-message")
+def create_test_message():
+    """
+    Process a manually submitted test message.
+
+    The endpoint expects a JSON body containing a message field.
+    This allows the backend to be tested before Telegram integration.
+    """
+
+    data = request.get_json(silent=True)
+
+    if data is None:
+        return jsonify(
+            {
+                "error": "Invalid request.",
+                "message": "Request body must be valid JSON.",
+            }
+        ), 400
+
+    message = data.get("message")
+
+    if message is None:
+        return jsonify(
+            {
+                "error": "Missing field.",
+                "message": "The 'message' field is required.",
+            }
+        ), 400
+
+    message = message.strip()
+
+    if message == "":
+        return jsonify(
+            {
+                "error": "Empty message.",
+                "message": "The 'message' field cannot be empty.",
+            }
+        ), 400
+
+    try:
+        result = process_raw_message(message)
+    except Exception as error:
+        return jsonify(
+            {
+                "error": "Signal processing failed.",
+                "message": str(error),
+            }
+        ), 500
+
+    return jsonify(
+        {
+            "message": result["message"],
+            "signal": result["signal"].to_dict(),
+        }
+    ), 201
+
+
 with app.app_context():
     # Create database tables for all registered models.
-    # At this stage no model has been added yet, but keeping this call here
-    # prepares the application for the signal model introduced later.
     db.create_all()
+
 
 if __name__ == "__main__":
     # Start the local Flask development server using values from config.py.
