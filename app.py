@@ -88,9 +88,12 @@ def create_test_message():
     Process a manually submitted test message.
 
     The endpoint expects a JSON body containing a message field.
-    This allows the backend to be tested before Telegram integration.
+    It passes the message to the signal service and returns the full
+    processing result to the client.
     """
 
+    # Read the JSON request body without raising an exception if the
+    # request body is missing or invalid.
     data = request.get_json(silent=True)
 
     if data is None:
@@ -111,6 +114,7 @@ def create_test_message():
             }
         ), 400
 
+    # Remove unnecessary surrounding spaces before processing the message.
     message = message.strip()
 
     if message == "":
@@ -122,6 +126,8 @@ def create_test_message():
         ), 400
 
     try:
+        # The service handles filtering, OpenAI parsing, database storage,
+        # and final status assignment.
         result = process_raw_message(message)
     except Exception as error:
         return jsonify(
@@ -131,12 +137,18 @@ def create_test_message():
             }
         ), 500
 
+    # Accepted trading signals create a parsed PENDING record.
+    # Ignored messages are still stored, but the request itself is valid.
+    status_code = 201 if result["accepted"] else 200
+
     return jsonify(
         {
             "message": result["message"],
+            "reasons": result["reasons"],
+            "parsed_signal": result["parsed_signal"],
             "signal": result["signal"].to_dict(),
         }
-    ), 201
+    ), status_code
 
 
 with app.app_context():
