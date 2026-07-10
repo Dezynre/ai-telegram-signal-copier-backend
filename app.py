@@ -113,6 +113,77 @@ def get_pending_signal():
             "signal": signal.to_dict(),
         }
     ), 200
+
+
+@app.post("/api/v1/signals/<int:signal_id>/status")
+def update_signal_status(signal_id):
+    """
+    Update the processing status of a signal.
+
+    MetaTrader 5 calls this endpoint after handling a pending signal.
+    In this part of the article, the EA sends a controlled status update
+    only to verify POST communication with the Flask backend.
+    """
+
+    data = request.get_json(silent=True)
+
+    if data is None:
+        return jsonify(
+            {
+                "error": "Invalid request.",
+                "message": "Request body must be valid JSON.",
+            }
+        ), 400
+
+    status = data.get("status")
+
+    if status not in ["EXECUTED", "FAILED"]:
+        return jsonify(
+            {
+                "error": "Invalid status.",
+                "message": "Status must be EXECUTED or FAILED.",
+            }
+        ), 400
+
+    ticket = data.get("ticket")
+    message = data.get("message")
+
+    if message is None:
+        message = ""
+
+    if ticket is not None:
+        try:
+            ticket = int(ticket)
+        except (TypeError, ValueError):
+            return jsonify(
+                {
+                    "error": "Invalid ticket.",
+                    "message": "Ticket must be an integer or null.",
+                }
+            ), 400
+
+    signal = db.session.get(Signal, signal_id)
+
+    if signal is None:
+        return jsonify(
+            {
+                "error": "Signal not found.",
+                "message": "No signal exists with the provided ID.",
+            }
+        ), 404
+
+    signal.status = status
+    signal.execution_ticket = ticket
+    signal.execution_message = message
+
+    db.session.commit()
+
+    return jsonify(
+        {
+            "message": "Signal status updated successfully.",
+            "signal": signal.to_dict(),
+        }
+    ), 200
     
 
 @app.post("/api/v1/test-message")
