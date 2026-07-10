@@ -123,8 +123,8 @@ def main():
             )
 
             print("[TELEGRAM] Processing result:", result["message"])
-            print("[TELEGRAM] Stored signal ID:", result["signal"].id)
-            print("[TELEGRAM] Stored signal status:", result["signal"].status)
+            print("[TELEGRAM] Stored signal ID:", result["signal"]["id"])
+            print("[TELEGRAM] Stored signal status:", result["signal"]["status"])
 
         except Exception as error:
             # Keep the listener alive and print the error for debugging.

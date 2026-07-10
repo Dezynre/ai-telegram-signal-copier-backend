@@ -82,6 +82,39 @@ def list_signals():
     ), 200
 
 
+@app.get("/api/v1/signals/pending")
+def get_pending_signal():
+    """
+    Return the oldest pending signal waiting for MetaTrader 5.
+
+    The EA polls this endpoint on a timer. If no pending signal exists,
+    the endpoint returns signal: null so the EA can wait for the next
+    polling cycle without treating the response as an error.
+    """
+
+    signal = db.session.execute(
+        db.select(Signal)
+        .where(Signal.status == "PENDING")
+        .order_by(Signal.id.asc())
+        .limit(1)
+    ).scalars().first()
+
+    if signal is None:
+        return jsonify(
+            {
+                "message": "No pending signals available.",
+                "signal": None,
+            }
+        ), 200
+
+    return jsonify(
+        {
+            "message": "Pending signal found.",
+            "signal": signal.to_dict(),
+        }
+    ), 200
+    
+
 @app.post("/api/v1/test-message")
 def create_test_message():
     """
@@ -146,7 +179,7 @@ def create_test_message():
             "message": result["message"],
             "reasons": result["reasons"],
             "parsed_signal": result["parsed_signal"],
-            "signal": result["signal"].to_dict(),
+            "signal": result["signal"],
         }
     ), status_code
 

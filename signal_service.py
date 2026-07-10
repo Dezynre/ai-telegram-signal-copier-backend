@@ -20,6 +20,9 @@ def process_raw_message(message, telegram_message_id=None):
 
     The function stores every received message, but the final status
     depends on how far the message moves through the processing workflow.
+
+    Returns:
+        dict: Processing result containing JSON-safe signal data.
     """
 
     # Step 1: Run a lightweight local filter before calling OpenAI.
@@ -42,7 +45,7 @@ def process_raw_message(message, telegram_message_id=None):
             "message": "Message ignored. It does not look like a trading signal.",
             "reasons": reasons,
             "parsed_signal": None,
-            "signal": signal,
+            "signal": signal.to_dict(),
         }
 
     # Step 2: Candidate messages are sent to OpenAI for structured parsing.
@@ -66,7 +69,7 @@ def process_raw_message(message, telegram_message_id=None):
             "message": "OpenAI did not classify this message as a trading signal.",
             "reasons": [],
             "parsed_signal": parsed_signal,
-            "signal": signal,
+            "signal": signal.to_dict(),
         }
 
     # Step 3: Valid parsed signals are stored with extracted trade fields.
@@ -93,5 +96,5 @@ def process_raw_message(message, telegram_message_id=None):
         "message": "Message parsed and stored successfully.",
         "reasons": [],
         "parsed_signal": parsed_signal,
-        "signal": signal,
+        "signal": signal.to_dict(),
     }
